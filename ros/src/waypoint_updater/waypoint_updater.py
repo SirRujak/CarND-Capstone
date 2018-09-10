@@ -11,7 +11,7 @@ This node will publish waypoints from the car's current position to some `x` dis
 
 As mentioned in the doc, you should ideally first implement a version which does not care
 about traffic lights or obstacles.
-
+f
 Once you have created dbw_node, you will update this node to use the status of traffic lights too.
 
 Please note that our simulator also provides the exact location of traffic lights and their
@@ -90,6 +90,7 @@ class WaypointUpdater(object):
        self.base_waypoints = waypoints
        if not self.waypoints_2d:
            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
+           self.waypoint_tree = KDTree(self.waypoints_2d)
 
    def traffic_cb(self, msg):
        # TODO: Callback for /traffic_waypoint message. Implement
