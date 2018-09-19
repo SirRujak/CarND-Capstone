@@ -41,6 +41,7 @@ class Controller(object):
         # Return throttle, brake, steer
         if not dbw_enabled:
             self.reset()
+            self.last_timestamp = rospy.Time.now()
             return 0., 0., 0.
 
         steer = self.steering_controller.get_steering(target_linear_velocity, target_angular_velocity, current_linear_velocity)
@@ -57,10 +58,12 @@ class Controller(object):
             if self.low_pass_filter.ready:
                 acceleration = self.low_pass_filter.get()
 
-            if acceleration > 0:
+            if acceleration >= 0:
                 throttle = acceleration
+                brake = 0.
             else:
                 brake = self.vehicle_mass * abs(acceleration) * self.wheel_radius
+                throttle = 0.
 
 
         self.last_timestamp = current_timestamp
@@ -74,4 +77,4 @@ class Controller(object):
         Reset the controller's state.
         """
         self.throttle_controller.reset()
-        self.low_pass_filter.reset()
+        self.low_pass_filter = LowPassFilter(12.0, 1)
