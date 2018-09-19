@@ -48,7 +48,7 @@ class DBWNode(object):
         min_speed = rospy.get_param('~min_speed', 0.)
 
         # Publishers	
-		self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
+        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
                                          SteeringCmd, queue_size=1)
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
                                             ThrottleCmd, queue_size=1)
