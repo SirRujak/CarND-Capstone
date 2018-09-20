@@ -107,7 +107,7 @@ class WaypointUpdater(object):
                 lane.waypoints = base_waypoints
                 self.currently_slowing = False
             else:
-                rospy.logwarn("Need to stop.")
+                #rospy.logwarn("Need to stop.")
                 lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
                 self.currently_slowing = True
         else:
