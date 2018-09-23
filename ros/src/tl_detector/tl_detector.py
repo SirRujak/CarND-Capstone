@@ -85,7 +85,7 @@ class TLDetector(object):
         if self.waypoint_tree:
             state, close_enough = self.process_traffic_lights()
             rospy.logwarn("Close enough: " + str(close_enough))
-            if close_enough:
+            if True:
                 rospy.logwarn("saving file")
                 rospy.logwarn(state)
                 cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
