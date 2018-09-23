@@ -44,8 +44,6 @@ class TLDetector(object):
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
 
-        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
-
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
@@ -81,38 +79,26 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        current_time = rospy.get_time()
-        if current_time - self.processed_last > self.time_delay:
-            #rospy.logwarn("Process Image")
-            self.has_image = True
-            self.camera_image = msg
-            light_wp, state = self.process_traffic_lights()
+        rospy.logwarn("Process Image")
+        self.has_image = True
+        self.camera_image = msg
+        if self.waypoint_tree:
+            state, close_enough = self.process_traffic_lights()
+            rospy.logwarn("Close enough: " + str(close_enough))
+            if close_enough:
+                rospy.logwarn("saving file")
+                rospy.logwarn(state)
+                cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+                cv2.imwrite("./data/simulator/" + str(state) + "/" + str(rospy.get_time()) + ".jpg", cv_image)
+                rospy.logwarn("file saved")
 
-            '''
-            Publish upcoming red lights at camera frequency.
-            Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
-            of times till we start using it. Otherwise the previous stable state is
-            used.
-            '''
-            if self.state != state:
-                self.state_count = 0
-                self.state = state
-                if state == TrafficLight.RED:
-                    self.time_delay = 0.0
-                else:
-                    self.time_delay = 0.5
-            elif self.state_count >= STATE_COUNT_THRESHOLD:
-                self.last_state = self.state
-                light_wp = light_wp if state == TrafficLight.RED else -1
-                self.last_wp = light_wp
-                #rospy.logwarn(self.last_wp)
-                self.upcoming_red_light_pub.publish(Int32(light_wp))
-                #rospy.logwarn(self.state_count)
-                #rospy.logwarn(self.state)
-            self.processed_last = rospy.get_time()
-        else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
+        '''
+        Publish upcoming red lights at camera frequency.
+        Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
+        of times till we start using it. Otherwise the previous stable state is
+        used.
+        '''
+     
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
@@ -141,10 +127,12 @@ class TLDetector(object):
             self.prev_light_loc = None
             return False
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        #cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         #Get classification
-        return self.light_classifier.get_classification(cv_image)
+        #return self.light_classifier.get_classification(cv_image)
+        #rospy.logwarn(light)
+        return light.state
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -176,12 +164,22 @@ class TLDetector(object):
                     closest_light = light
                     line_wp_idx = temp_wp_idx
 
+        close_enough = False
         if closest_light:
-            state = self.get_light_state(closest_light)
-            return line_wp_idx, state
+            if diff < 250 and diff > 0:
+                close_enough = True
+                ## This should return either the current state of the nearest light.
+                state = self.get_light_state(light)
+            else:
+                ## If the light is too far away then return UNKNOWN
+                 state = TrafficLight.UNKNOWN
+            ##state = self.get_light_state(closest_light)
+            ##return line_wp_idx, state
+            return state, close_enough
 
         ##self.waypoints = None
-        return -1, TrafficLight.UNKNOWN
+        ##return -1, TrafficLight.UNKNOWN
+        return TrafficLight.UNKNOWN, close_enough
 
 if __name__ == '__main__':
     try:
