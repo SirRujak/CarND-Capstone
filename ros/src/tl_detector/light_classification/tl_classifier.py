@@ -30,7 +30,7 @@ class TLClassifier(object):
 
         """
         # image preprocessing
-        img_norm = cv2.resize((image - np.mean(IMAGE_MEAN)), (HEIGHT, WIDTH)) / 256
+        img_norm = cv2.resize((image), (HEIGHT, WIDTH)) / 256.0
 
         # inference
         probs = self.sess.run(tf.nn.softmax(self.logit), feed_dict={self.x: img_norm.reshape(1, WIDTH, HEIGHT, CHANNEL), self.keep_prob: 1.})

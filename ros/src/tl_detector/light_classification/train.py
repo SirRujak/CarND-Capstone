@@ -6,15 +6,17 @@ import numpy as np
 import cv2
 
 # define image input size
-HEIGHT = 32
-WIDTH = 32
+HEIGHT = 224
+WIDTH = 224
 num_channel = 3
 num_class = 4
 
 # training parameters setting
-epoch = 500
+epoch = 32
 batch_size = 256
-learning_rate = 0.001
+learning_rate = 0.000001
+
+split = 0.8
 
 
 def preprocess(X):
@@ -201,6 +203,12 @@ def LightNet(num_channel=3, num_class=4):
 
     return logits
 
+def get_batch(data_list, lable_list):
+    batch_labels = lable_list
+    batch_data = []
+    for file_name in data_list:
+        batch_data.append(cv2.resize(cv2.imread(file_name), (WIDTH, HEIGHT))/256.0)
+    return batch_data, batch_labels
 
 def train(data, label):
     # define operations
@@ -214,10 +222,15 @@ def train(data, label):
         sess.run(tf.global_variables_initializer())
         print('Start training ...\n')
         for e in range(epoch):
-            for start in range(0, len(data), batch_size):
+            current_image = 0
+            for start in range(0, int(len(data) * split), batch_size):
                 end = start + batch_size
-                x_batch, y_batch = data[start:end], label[start:end]
+                #x_batch, y_batch = data[start:end], label[start:end]
+                x_batch, y_batch = get_batch(data[start:end], label[start:end])
                 sess.run(training_operation, feed_dict={x: x_batch, y: y_batch, keep_prob: 0.5})
+                if current_image % 3 == 0:
+                    print("Processing image: " + str(current_image * 256))
+                current_image += 1
             validation_accuracy = evaluate(data, label)
             print("epoch ", e + 1)
             print("Validation accuracy = {:.3f}\n".format(validation_accuracy))
@@ -234,11 +247,12 @@ def evaluate(data, label):
     num_examples = len(data)
     total_accuracy = 0
     sess = tf.get_default_session()
-    for offset in range(0, num_examples, batch_size):
-        batch_x, batch_y = data[offset:offset+batch_size], label[offset:offset+batch_size]
+    for offset in range(int(num_examples * split), num_examples, batch_size):
+        #batch_x, batch_y = data[offset:offset+batch_size], label[offset:offset+batch_size]
+        batch_x, batch_y = get_batch(data[offset:offset+batch_size], label[offset:offset+batch_size])
         accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 1.})
         total_accuracy += (accuracy * len(batch_x))
-    return total_accuracy / num_examples
+    return total_accuracy / (num_examples * (1 - split))
 
 # -------------------------------------------------------------
 #
@@ -259,11 +273,11 @@ with open(data_path, 'rb') as f:
 
 images = np.array(data['image'])
 labels = np.array(data['label'])
-images = preprocess(images)
+#images = preprocess(images)
 
 # shuffle data
 data, label = shuffle(images, labels)
 
 # train
-logits = LightNet()
+logits = AlexNet()
 train(data, label)
