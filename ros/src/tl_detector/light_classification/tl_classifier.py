@@ -18,6 +18,9 @@ class TLClassifier(object):
         #self.logit = self.alexnet()
         self.sess = tf.Session()
         self.model = tf.contrib.keras.models.load_model('model/keras_light_model_130_0.993489583333.h5')
+        
+        self.graph = tf.get_default_graph()
+        print(self.model.summary())
         #tf.train.Saver().restore(self.sess, 'model/model.ckpt-640')
 
     def get_classification(self, image):
@@ -35,6 +38,7 @@ class TLClassifier(object):
 
         # inference
         #probs = self.sess.run(tf.nn.softmax(self.logit), feed_dict={self.x: img_norm.reshape(1, WIDTH, HEIGHT, CHANNEL), self.keep_prob: 1.})
-        probs = self.model.predict(img_norm.reshape(1, WIDTH, HEIGHT, CHANNEL))
+        with self.graph.as_default():
+            probs = self.model.predict(np.array(img_norm.reshape(1, WIDTH, HEIGHT, CHANNEL)))
         idx = np.argmax(probs)
         return 4 if idx == 3 else idx
