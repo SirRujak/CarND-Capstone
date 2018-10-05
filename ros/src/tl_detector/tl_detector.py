@@ -30,6 +30,7 @@ class TLDetector(object):
         self.waypoint_tree = None
         self.processed_last = rospy.get_time()
         self.time_delay = 0.0
+        self.closest_waypoint = None
 
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
@@ -62,7 +63,7 @@ class TLDetector(object):
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
-        self.state_count = 0
+        self.state_count = 5
 
 
         rospy.spin()
@@ -90,11 +91,16 @@ class TLDetector(object):
         """
         current_time = rospy.get_time()
         if current_time - self.processed_last > self.time_delay:
-            rospy.logwarn("Process Image")
+            #rospy.logwarn("Process Image")
             #rospy.logwarn(self.state_count)
             self.has_image = True
             self.camera_image = msg
             light_wp, state = self.process_traffic_lights()
+
+            farthest_for_red = 75
+            closest_for_red = 0
+            farthest_for_yellow = 100
+            closest_for_yellow = 35
 
             '''
             Publish upcoming red lights at camera frequency.
@@ -106,14 +112,24 @@ class TLDetector(object):
                 #rospy.logwarn("State is different.")
                 self.state_count
                 self.state = state
-                if state == TrafficLight.RED:
+                if state == TrafficLight.RED or state == TrafficLight.YELLOW:
                     self.time_delay = 0.0
                 else:
                     self.time_delay = 0.75
             elif self.state_count >= STATE_COUNT_THRESHOLD:
                 #rospy.logwarn("State threshold passed.")
                 self.last_state = self.state
-                light_wp = light_wp if state == TrafficLight.RED else -1
+                #light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
+                waypoint_diff = light_wp - self.closest_waypoint
+                if state == TrafficLight.YELLOW:
+                    if waypoint_diff > farthest_for_yellow or waypoint_diff < closest_for_yellow:
+                        light_wp = -1
+                elif state == TrafficLight.RED:
+                    if waypoint_diff > farthest_for_red or waypoint_diff < closest_for_red:
+                        light_wp = -1
+                else:
+                    light_wp = -1
+
                 self.last_wp = light_wp
                 #rospy.logwarn(self.last_wp)
                 self.upcoming_red_light_pub.publish(Int32(light_wp))
@@ -220,6 +236,8 @@ class TLDetector(object):
         stop_line_positions = self.config['stop_line_positions']
         if(self.pose):
             car_wp_idx = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
+            self.closest_waypoint = car_wp_idx
+
 
             ## Find the closest visible traffic light (if one exists).
             diff = len(self.waypoints.waypoints)

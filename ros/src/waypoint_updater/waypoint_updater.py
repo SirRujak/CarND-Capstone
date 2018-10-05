@@ -3,6 +3,7 @@
 import numpy as np
 import rospy
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 from scipy.spatial import KDTree
@@ -35,6 +36,7 @@ class WaypointUpdater(object):
        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+       rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_callback)
 
        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
@@ -44,6 +46,7 @@ class WaypointUpdater(object):
        # TODO: Add other member variables you need below
 
        self.pose = None
+       self.current_linear_velocity = None
        self.base_waypoints = None
        self.waypoints_2d = None
        self.waypoint_tree = None
@@ -51,6 +54,8 @@ class WaypointUpdater(object):
        self.currently_slowing = False
        self.slow_start = 0
        self.slow_end = 0
+       self.start_dist = 0.0
+       self.stop_dist = 10.0
 
        self.loop()
 
@@ -63,7 +68,20 @@ class WaypointUpdater(object):
                ##closest_waypoint_idx = self.get_closest_waypoint_idx()
                ##self.publish_waypoints(closest_waypoint_idx)
                self.publish_waypoints()
+               #rospy.logwarn("test2")
            rate.sleep()
+
+   def velocity_callback(self, msg):
+        """
+        /current_velocity topic callback handler.
+        msg : geometry_msgs.msg.TwistStamped
+
+        Updates state:
+        - current_linear_velocity
+        - current_angular_velocity
+        """
+        self.current_linear_velocity = msg.twist.linear.x
+        #self.current_angular_velocity = msg.twist.angular.z
 
    def get_closest_waypoint_idx(self):
        x = self.pose.pose.position.x
@@ -103,7 +121,9 @@ class WaypointUpdater(object):
         base_waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
 
         if self.stopline_wp_idx:
+            #rospy.logwarn(self.stopline_wp_idx)
             if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
+                #rospy.logwarn("Test")
                 lane.waypoints = base_waypoints
                 self.currently_slowing = False
             else:
@@ -129,21 +149,38 @@ class WaypointUpdater(object):
         current_vel = waypoints[0].twist.twist.linear.x
 
         if not self.currently_slowing:
-            self.slow_start = waypoints[0].pose.pose.position.x
+            rospy.logwarn("Just calculated stopping curve!")
+            self.slow_start = self.pose.pose.position.x
 
-            stop_idx = max(self.stopline_wp_idx - closest_idx - 4, 0)
-            self.slow_end = waypoints[stop_idx].pose.pose.position.x
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            self.slow_start = self.distance(waypoints, 0, 0)
+            self.slow_end = self.distance(waypoints, 0, stop_idx)
+            #self.slow_end = waypoints[stop_idx].pose.pose.position.x
+            self.currently_slowing = True
+            self.current_vel = self.current_linear_velocity
+            if self.current_vel < 2.0:
+                self.current_vel = 3.0
+
+            rospy.logwarn("Range to stop is: " + str(self.slow_end))
+            rospy.logwarn("Current velocity is: " + str(self.current_vel))
         ##total_distance = self.distance(waypoints, 0, stop_idx)
         for i, wp in enumerate(waypoints):
             p = Waypoint()
             p.pose = wp.pose
             current_position = p.pose.pose.position.x
-            vel = self.target_velocity(self.slow_start, self.slow_end, current_position, current_vel)
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 3, 0)
+            #dist = self.distance(waypoints, i, stop_idx)
+            #vel = math.sqrt(2 * MAX_DECEL * dist)
+            dist = self.slow_end - self.distance(waypoints, i , stop_idx)
+            vel = self.target_velocity(self.slow_start, self.slow_end, dist, self.current_vel)
             if vel < 1.:
                 vel = 0.
+            #rospy.logwarn(vel)
 
             p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             temp.append(p)
+        #rospy.logwarn(temp[0].twist.twist.linear.x)
+        #rospy.logwarn(self.slow_end)
         return temp
         '''  
         for i, wp in enumerate(waypoints):
