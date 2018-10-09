@@ -19,7 +19,6 @@ class Controller(object):
                  loop_frequency,
                  vehicle_mass,
                  wheel_radius):
-        # TODO: Implement
         self.wheel_base = wheel_base
         self.steer_ratio = steer_ratio
         self.max_steer_angle = max_steer_angle
@@ -37,12 +36,11 @@ class Controller(object):
 
 
     def control(self, target_angular_velocity, target_linear_velocity, current_angular_velocity, current_linear_velocity, dbw_enabled):
-        # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
-        if not dbw_enabled:
+        if target_linear_velocity < 0.5 or not dbw_enabled:
             self.reset()
             self.last_timestamp = rospy.Time.now()
-            return 0., 0., 0.
+            return 0., 35., 0.
 
         steer = self.steering_controller.get_steering(target_linear_velocity, target_angular_velocity, current_linear_velocity)
         throttle = 0.

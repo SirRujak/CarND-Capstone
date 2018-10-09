@@ -3,6 +3,7 @@
 import numpy as np
 import rospy
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 from scipy.spatial import KDTree
@@ -21,7 +22,6 @@ Please note that our simulator also provides the exact location of traffic light
 current status in `/vehicle/traffic_lights` message. You can use this message to build this node
 as well as to verify your TL classifier.
 
-TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
@@ -35,15 +35,12 @@ class WaypointUpdater(object):
        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
-
-       # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-
+       rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_callback)
 
        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-       # TODO: Add other member variables you need below
-
        self.pose = None
+       self.current_linear_velocity = None
        self.base_waypoints = None
        self.waypoints_2d = None
        self.waypoint_tree = None
@@ -51,6 +48,8 @@ class WaypointUpdater(object):
        self.currently_slowing = False
        self.slow_start = 0
        self.slow_end = 0
+       self.start_dist = 0.0
+       self.stop_dist = 10.0
 
        self.loop()
 
@@ -60,10 +59,19 @@ class WaypointUpdater(object):
        while not rospy.is_shutdown():
            if self.pose and self.base_waypoints and self.waypoint_tree:
                # Get closest waypoint.
-               ##closest_waypoint_idx = self.get_closest_waypoint_idx()
-               ##self.publish_waypoints(closest_waypoint_idx)
                self.publish_waypoints()
            rate.sleep()
+
+   def velocity_callback(self, msg):
+        """
+        /current_velocity topic callback handler.
+        msg : geometry_msgs.msg.TwistStamped
+
+        Updates state:
+        - current_linear_velocity
+        - current_angular_velocity
+        """
+        self.current_linear_velocity = msg.twist.linear.x
 
    def get_closest_waypoint_idx(self):
        x = self.pose.pose.position.x
@@ -86,12 +94,6 @@ class WaypointUpdater(object):
        return closest_idx
 
    def publish_waypoints(self):
-       '''
-       lane = Lane()
-       lane.header = self.base_waypoints.header
-       lane.waypoints = self.base_waypoints.waypoints[closest_idx:closest_idx + LOOKAHEAD_WPS]
-       self.final_waypoints_pub.publish(lane)
-       '''
        final_lane = self.generate_lane()
        self.final_waypoints_pub.publish(final_lane)
 
@@ -107,7 +109,6 @@ class WaypointUpdater(object):
                 lane.waypoints = base_waypoints
                 self.currently_slowing = False
             else:
-                #rospy.logwarn("Need to stop.")
                 lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
                 self.currently_slowing = True
         else:
@@ -129,56 +130,43 @@ class WaypointUpdater(object):
         current_vel = waypoints[0].twist.twist.linear.x
 
         if not self.currently_slowing:
-            self.slow_start = waypoints[0].pose.pose.position.x
+            self.slow_start = self.pose.pose.position.x
 
-            stop_idx = max(self.stopline_wp_idx - closest_idx - 4, 0)
-            self.slow_end = waypoints[stop_idx].pose.pose.position.x
-        ##total_distance = self.distance(waypoints, 0, stop_idx)
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            self.slow_start = self.distance(waypoints, 0, 0)
+            self.slow_end = self.distance(waypoints, 0, stop_idx)
+            self.currently_slowing = True
+            self.current_vel = self.current_linear_velocity
+            if self.current_vel < 2.0:
+                self.current_vel = 3.0
+
         for i, wp in enumerate(waypoints):
             p = Waypoint()
             p.pose = wp.pose
             current_position = p.pose.pose.position.x
-            vel = self.target_velocity(self.slow_start, self.slow_end, current_position, current_vel)
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 3, 0)
+            dist = self.slow_end - self.distance(waypoints, i , stop_idx)
+            vel = self.target_velocity(self.slow_start, self.slow_end, dist, self.current_vel)
             if vel < 1.:
                 vel = 0.
 
             p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             temp.append(p)
         return temp
-        '''  
-        for i, wp in enumerate(waypoints):
-            p = Waypoint()
-            p.pose = wp.pose
-            ## Two waypoints back from line so front of car stops at line.
-            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
-            dist = self.distance(waypoints, i, stop_idx)
-            ## FIXME: Needs a differentiable function here.
-            vel = math.sqrt(2 * MAX_DECEL * dist)
-            if vel < 1.:
-                vel = 0.
-
-            p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
-            temp.append(p)
-        return temp
-        '''
 
    def pose_cb(self, msg):
-       # TODO: Implement
        self.pose = msg
 
    def waypoints_cb(self, waypoints):
-       # TODO: Implement
        self.base_waypoints = waypoints
        if not self.waypoints_2d:
            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
            self.waypoint_tree = KDTree(self.waypoints_2d)
 
    def traffic_cb(self, msg):
-       # TODO: Callback for /traffic_waypoint message. Implement
        self.stopline_wp_idx = msg.data
 
    def obstacle_cb(self, msg):
-       # TODO: Callback for /obstacle_waypoint message. We will implement it later
        pass
 
    def get_waypoint_velocity(self, waypoint):

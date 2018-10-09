@@ -6,15 +6,17 @@ import numpy as np
 import cv2
 
 # define image input size
-HEIGHT = 32
-WIDTH = 32
+HEIGHT = 224
+WIDTH = 224
 num_channel = 3
 num_class = 4
 
 # training parameters setting
 epoch = 500
-batch_size = 256
-learning_rate = 0.001
+batch_size = 32
+learning_rate = 0.000001
+
+split = 0.9
 
 
 def preprocess(X):
@@ -26,7 +28,7 @@ def preprocess(X):
     X_norm = np.array([cv2.resize((img - np.mean(image_mean)), (HEIGHT, WIDTH)) / 256 for img in X])
 
     return X_norm
-
+'''
 
 def AlexNet():
     mu = 0
@@ -200,45 +202,100 @@ def LightNet(num_channel=3, num_class=4):
     print('output: ', logits.shape)
 
     return logits
+'''
+'''
+input_tensor = tf.contrib.keras.layers.Input(shape=(WIDTH, HEIGHT,3,))
+model = tf.contrib.keras.applications.InceptionV3(input_tensor=input_tensor, include_top=False)
+x = model.output
+model = tf.contrib.keras.layers.Dense(4)(x)
+model = tf.contrib.keras.models.Model([input_tensor], [model])
+'''
+model = tf.contrib.keras.models.Sequential()
+model.add(tf.contrib.keras.layers.Conv2D(8, 4, 4, activation='relu', padding="valid", batch_input_shape=(None, 600, 800, 3,)))
+model.add(tf.contrib.keras.layers.Conv2D(32, 3, 3, activation='relu', padding="valid"))
+model.add(tf.contrib.keras.layers.Conv2D(64, 2, 2, activation='relu', padding="valid"))
+model.add(tf.contrib.keras.layers.Conv2D(96, 2, 2, activation='relu', padding="valid"))
+model.add(tf.contrib.keras.layers.Conv2D(128, 2, 2, activation='relu', padding="valid"))
+model.add(tf.contrib.keras.layers.Flatten())
+model.add(tf.contrib.keras.layers.Dense(256))
+model.add(tf.contrib.keras.layers.Dense(128))
+model.add(tf.contrib.keras.layers.Dense(64))
+model.add(tf.contrib.keras.layers.Dense(32))
+model.add(tf.contrib.keras.layers.Dense(4))
+model.add(tf.contrib.keras.layers.Activation('softmax'))
 
+model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=['mse', 'accuracy'])
+
+def get_batch(data_list, label_list):
+    batch_labels = []
+    batch_data = []
+    for key, file_name in enumerate(data_list):
+        img_data = cv2.imread(file_name)
+        ##print(img_data)
+        batch_data.append(img_data/255.0)
+        temp_label = label_list[key]
+        if temp_label == 4:
+            temp_label = 3
+        batch_labels.append(temp_label)
+        #print(temp_label)
+        #print(tf.contrib.keras.utils.to_categorical(np.array(temp_label), num_classes=4))
+    return np.array(batch_data), tf.contrib.keras.utils.to_categorical(np.array(batch_labels), num_classes=4)
 
 def train(data, label):
     # define operations
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_y, logits=logits)
-    loss_operation = tf.reduce_mean(cross_entropy)
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    training_operation = optimizer.minimize(loss_operation)
-    saver = tf.train.Saver()
-
+    #cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_y, logits=logits)
+    #loss_operation = tf.reduce_mean(cross_entropy)
+    #optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    #training_operation = optimizer.minimize(loss_operation)
+    #saver = tf.train.Saver()
+    train_data = data[:int(len(data) * split)]
+    train_label = label[:int(len(data) * split)]
+    validation_data = data[int(len(data) * split):]
+    validation_label = label[int(len(data) * split):]
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         print('Start training ...\n')
         for e in range(epoch):
-            for start in range(0, len(data), batch_size):
+            current_image = 0
+            for start in range(0, len(train_data), batch_size):
                 end = start + batch_size
-                x_batch, y_batch = data[start:end], label[start:end]
-                sess.run(training_operation, feed_dict={x: x_batch, y: y_batch, keep_prob: 0.5})
-            validation_accuracy = evaluate(data, label)
+                #x_batch, y_batch = data[start:end], label[start:end]
+                x_batch, y_batch = get_batch(train_data[start:end], train_label[start:end])
+                model.train_on_batch(x_batch, y_batch)
+                #sess.run(training_operation, feed_dict={x: x_batch, y: y_batch, keep_prob: 0.5})
+                if current_image % 3 == 0:
+                    print("Processing image: " + str(current_image * batch_size))
+                current_image += 1
+            validation_accuracy = evaluate(validation_data, validation_label)
             print("epoch ", e + 1)
             print("Validation accuracy = {:.3f}\n".format(validation_accuracy))
+            train_data, train_label = shuffle(train_data, train_label)
             if e % 10 == 0:
-                saver.save(sess, './model/model.ckpt', global_step=e)
+                #saver.save(sess, './model/model.ckpt', global_step=e)
+                model.save('keras_light_model_' + str(e) + '_' + str(validation_accuracy) + '.h5')
         print("Model Saved")
 
 
 def evaluate(data, label):
     # define operations
-    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(one_hot_y, 1))
-    accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    #correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(one_hot_y, 1))
+    #accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     num_examples = len(data)
     total_accuracy = 0
     sess = tf.get_default_session()
+    num_batches = 0
     for offset in range(0, num_examples, batch_size):
-        batch_x, batch_y = data[offset:offset+batch_size], label[offset:offset+batch_size]
-        accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 1.})
-        total_accuracy += (accuracy * len(batch_x))
-    return total_accuracy / num_examples
+        #batch_x, batch_y = data[offset:offset+batch_size], label[offset:offset+batch_size]
+        batch_x, batch_y = get_batch(data[offset:offset+batch_size], label[offset:offset+batch_size])
+        #accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 1.})
+        #accuracy = model.evaluate(batch_x, batch_y)
+        #prediction = model.predict(batch_x)
+        loss, mse, accuracy = model.evaluate(batch_x, batch_y)
+        print(accuracy)
+        total_accuracy += accuracy
+        num_batches += 1
+    return total_accuracy / num_batches
 
 # -------------------------------------------------------------
 #
@@ -259,11 +316,11 @@ with open(data_path, 'rb') as f:
 
 images = np.array(data['image'])
 labels = np.array(data['label'])
-images = preprocess(images)
+#images = preprocess(images)
 
 # shuffle data
 data, label = shuffle(images, labels)
 
 # train
-logits = LightNet()
+#logits = AlexNet()
 train(data, label)
