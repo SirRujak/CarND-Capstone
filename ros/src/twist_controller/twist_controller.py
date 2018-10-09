@@ -19,7 +19,6 @@ class Controller(object):
                  loop_frequency,
                  vehicle_mass,
                  wheel_radius):
-        # TODO: Implement
         self.wheel_base = wheel_base
         self.steer_ratio = steer_ratio
         self.max_steer_angle = max_steer_angle
@@ -37,7 +36,6 @@ class Controller(object):
 
 
     def control(self, target_angular_velocity, target_linear_velocity, current_angular_velocity, current_linear_velocity, dbw_enabled):
-        # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
         if target_linear_velocity < 0.5 or not dbw_enabled:
             self.reset()

@@ -91,8 +91,6 @@ class TLDetector(object):
         """
         current_time = rospy.get_time()
         if current_time - self.processed_last > self.time_delay:
-            #rospy.logwarn("Process Image")
-            #rospy.logwarn(self.state_count)
             self.has_image = True
             self.camera_image = msg
             light_wp, state = self.process_traffic_lights()
@@ -109,7 +107,6 @@ class TLDetector(object):
             used.
             '''
             if self.state != state:
-                #rospy.logwarn("State is different.")
                 self.state_count
                 self.state = state
                 if state == TrafficLight.RED or state == TrafficLight.YELLOW:
@@ -117,9 +114,7 @@ class TLDetector(object):
                 else:
                     self.time_delay = 0.75
             elif self.state_count >= STATE_COUNT_THRESHOLD:
-                #rospy.logwarn("State threshold passed.")
                 self.last_state = self.state
-                #light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
                 waypoint_diff = light_wp - self.closest_waypoint
                 if state == TrafficLight.YELLOW:
                     if waypoint_diff > farthest_for_yellow or waypoint_diff < closest_for_yellow:
@@ -131,10 +126,7 @@ class TLDetector(object):
                     light_wp = -1
 
                 self.last_wp = light_wp
-                #rospy.logwarn(self.last_wp)
                 self.upcoming_red_light_pub.publish(Int32(light_wp))
-                #rospy.logwarn(self.state_count)
-                #rospy.logwarn(self.state)
             self.processed_last = rospy.get_time()
         else:
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
@@ -195,7 +187,6 @@ class TLDetector(object):
 
         ## Get classification.
         classification =  self.light_classifier.get_classification(cv_image)
-        ##rospy.logwarn(classification)
         return classification
 
 
@@ -212,12 +203,6 @@ class TLDetector(object):
         if(not self.has_image):
             self.prev_light_loc = None
             return False
-
-        #cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
-        #Get classification
-        #return self.light_classifier.get_classification(cv_image)
-        #rospy.logwarn(light)
         return light.state
 
     def process_traffic_lights(self):
@@ -298,8 +283,6 @@ class TLDetector(object):
             else:
                 ## If the light is too far away then return UNKNOWN
                  state = TrafficLight.UNKNOWN
-            ##state = self.get_light_state(closest_light)
-            ##return line_wp_idx, state
             return state, close_enough
 
         ##self.waypoints = None
