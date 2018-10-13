@@ -26,7 +26,9 @@ class TLClassifier(object):
 
         """
         # image preprocessing
-        img_norm = image / 255.0
+        img_norm = cv2.resize(image, (HEIGHT, WIDTH))
+        img_norm = img_norm / 255.0
+
 
         # inference
         with self.graph.as_default():

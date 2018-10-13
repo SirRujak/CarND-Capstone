@@ -6,8 +6,8 @@ import numpy as np
 import cv2
 
 # define image input size
-HEIGHT = 224
-WIDTH = 224
+HEIGHT = 800
+WIDTH = 600
 num_channel = 3
 num_class = 4
 
@@ -231,6 +231,7 @@ def get_batch(data_list, label_list):
     batch_data = []
     for key, file_name in enumerate(data_list):
         img_data = cv2.imread(file_name)
+        img_data = cv2.resize(img_data, (HEIGHT, WIDTH))
         ##print(img_data)
         batch_data.append(img_data/255.0)
         temp_label = label_list[key]
@@ -249,9 +250,11 @@ def train(data, label):
     #training_operation = optimizer.minimize(loss_operation)
     #saver = tf.train.Saver()
     train_data = data[:int(len(data) * split)]
+    print(len(train_data))
     train_label = label[:int(len(data) * split)]
     validation_data = data[int(len(data) * split):]
     validation_label = label[int(len(data) * split):]
+    highest_accuracy = 0.0
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         print('Start training ...\n')
@@ -270,9 +273,11 @@ def train(data, label):
             print("epoch ", e + 1)
             print("Validation accuracy = {:.3f}\n".format(validation_accuracy))
             train_data, train_label = shuffle(train_data, train_label)
-            if e % 10 == 0:
-                #saver.save(sess, './model/model.ckpt', global_step=e)
-                model.save('keras_light_model_' + str(e) + '_' + str(validation_accuracy) + '.h5')
+            #if e % 10 == 0:
+            #    #saver.save(sess, './model/model.ckpt', global_step=e)
+            #    model.save('keras_light_model_' + str(e) + '_' + str(validation_accuracy) + '.h5')
+            if validation_accuracy > highest_accuracy:
+                model.save('keras_light_model' + str(e) + '_' + str(validation_accuracy) + '.h5')
         print("Model Saved")
 
 
