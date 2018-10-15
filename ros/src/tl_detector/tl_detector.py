@@ -142,18 +142,18 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        rospy.logwarn("Process Image")
+        rospy.loginfo("Process Image")
         self.has_image = True
         self.camera_image = msg
         if self.waypoint_tree:
             state, close_enough = self.process_traffic_lights_collect_data()
-            rospy.logwarn("Close enough: " + str(close_enough))
+            rospy.loginfo("Close enough: " + str(close_enough))
             if True:
-                rospy.logwarn("saving file")
-                rospy.logwarn(state)
+                rospy.loginfo("saving file")
+                rospy.loginfo(state)
                 cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
                 cv2.imwrite("./data/simulator/" + str(state) + "/" + str(rospy.get_time()) + ".jpg", cv_image)
-                rospy.logwarn("file saved")
+                rospy.loginfo("file saved")
      
 
     def get_closest_waypoint(self, x, y):
@@ -241,7 +241,6 @@ class TLDetector(object):
             state = self.get_light_state(closest_light)
             return line_wp_idx, state
 
-        ##self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 
     def process_traffic_lights_collect_data(self):
@@ -284,9 +283,6 @@ class TLDetector(object):
                 ## If the light is too far away then return UNKNOWN
                  state = TrafficLight.UNKNOWN
             return state, close_enough
-
-        ##self.waypoints = None
-        ##return -1, TrafficLight.UNKNOWN
         return TrafficLight.UNKNOWN, close_enough
 
 if __name__ == '__main__':

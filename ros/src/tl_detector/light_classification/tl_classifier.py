@@ -11,7 +11,7 @@ class TLClassifier(object):
 
     def __init__(self):
         self.sess = tf.Session()
-        self.model = tf.contrib.keras.models.load_model('model/keras_light_model_130_0.993489583333.h5')
+        self.model = tf.contrib.keras.models.load_model('model/keras_light_model_135_0.990301724138.h5')
         
         self.graph = tf.get_default_graph()
 

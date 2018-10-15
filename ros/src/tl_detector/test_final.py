@@ -5,7 +5,7 @@ import numpy as np
 
 WIDTH, HEIGHT, CHANNEL = 600, 800, 3
 NUM_CLASS = 4
-model = tf.contrib.keras.models.load_model('model/keras_light_model_130_0.993489583333.h5')
+model = tf.contrib.keras.models.load_model('model/keras_light_model_135_0.990301724138.h5')
 
 os.chdir("./data/simulator")
 
@@ -14,29 +14,25 @@ bottomLeftCornerOfText = (10,500)
 fontScale = 1
 fontColor = (255, 255, 255)
 lineType = 2
-
-for file in glob.glob("*.jpg"):
-    ## Load file
+for file in glob.glob("*/*.jpg"):
     img = cv2.imread(file)
     img = cv2.resize(img, (HEIGHT, WIDTH))
-    probs = model.predict(np.array(img.reshape(1, WIDTH, HEIGHT, CHANNEL)))
+    probs = model.predict(np.array(np.expand_dims(img, axis=0)))
     idx = np.argmax(probs)
+    prediction = None
+    if idx == 2 and idx == 3:
+        print(idx)
     if idx == 0:
         prediction = "RED"
-    if idx == 1:
+    elif idx == 1:
         prediction = "YELLOW"
-    if idx == 2:
+    elif idx == 2:
         prediction = "GREEN"
     else:
-        prediction = "NO LIGHT"
-
-    cv2.putText(img, prediction,
-        bottomLeftCornerOfText,
-        font,
-        fontScale,
-        fontColor,
-        lineType)
-    cv2.imwrite("new_imgs/" + file, img)
+        prediction = "NO_LIGHT"
+    print(prediction)
+    filename = file.split("/")[1]
+    cv2.imwrite("new_imgs/" + prediction + '/' + filename, img)
 
 
     
